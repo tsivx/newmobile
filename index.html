@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Магазин — Mini App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            border: '#e5e7eb',
+            input: '#e5e7eb',
+            ring: '#0f172a',
+            background: '#ffffff',
+            foreground: '#0f172a',
+            primary: { DEFAULT: '#0f172a', foreground: '#f8fafc' },
+            secondary: { DEFAULT: '#f1f5f9', foreground: '#0f172a' },
+            muted: { DEFAULT: '#f1f5f9', foreground: '#64748b' },
+            accent: { DEFAULT: '#f1f5f9', foreground: '#0f172a' },
+            card: { DEFAULT: '#ffffff', foreground: '#0f172a' },
+          },
+          borderRadius: { lg: '0.75rem', md: '0.5rem', sm: '0.375rem' },
+          fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','Segoe UI','Roboto','Helvetica','Arial','sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    html, body, #app { height: 100%; }
+    body { margin: 0; background: #f8fafc; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 0; height: 0; }
+    .sheet-enter-active, .sheet-leave-active { transition: transform .28s cubic-bezier(.32,.72,0,1); }
+    .sheet-enter-from, .sheet-leave-to { transform: translateY(100%); }
+    .fade-enter-active, .fade-leave-active { transition: opacity .2s ease; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    .screen-enter-active, .screen-leave-active { transition: opacity .18s ease, transform .18s ease; }
+    .screen-enter-from { opacity: 0; transform: translateX(12px); }
+    .screen-leave-to { opacity: 0; transform: translateX(-12px); position: absolute; inset: 0; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const { createApp, ref, computed, reactive } = Vue;
+
+    // ---- Мок-данные (в реальном приложении придут из Google Sheets) ----
+    const CATEGORIES = [
+      { id: 'iphone',   name: 'iPhone',            emoji: '📱' },
+      { id: 'android',  name: 'Android & Прочее',  emoji: '🤖' },
+      { id: 'airpods',  name: 'AirPods',           emoji: '🎧' },
+      { id: 'watch',    name: 'Watch',             emoji: '⌚' },
+      { id: 'macbook',  name: 'MacBook',           emoji: '💻' },
+      { id: 'ipad',     name: 'iPad',              emoji: '📝' },
+      { id: 'dyson',    name: 'Dyson',             emoji: '💨' },
+      { id: 'marshall', name: 'Наушники Marshall', emoji: '🎧' },
+      { id: 'accessories', name: 'Аксессуары',     emoji: '🔌' },
+    ];
+
+    const PRODUCTS = [
+      { id: 1,  cat: 'iphone', name: 'iPhone 13 128 Midnight', price: 44000, stock: 'В наличии' },
+      { id: 2,  cat: 'iphone', name: 'iPhone 15 128 Black', price: 54000, stock: 'В наличии' },
+      { id: 3,  cat: 'iphone', name: 'iPhone 15 256 Pink', price: 66000, stock: 'В наличии' },
+      { id: 4,  cat: 'iphone', name: 'iPhone 16 128 Teal', price: 61000, stock: 'В наличии' },
+      { id: 5,  cat: 'iphone', name: 'iPhone 16 Pro 128 Natural (2 sim)', price: 83000, stock: 'Под заказ' },
+      { id: 6,  cat: 'iphone', name: 'iPhone 16 Pro Max 256 Black', price: 109000, stock: 'В наличии' },
+      { id: 7,  cat: 'iphone', name: 'iPhone 17 256 Lavender', price: 74000, stock: 'Предзаказ 7 дней' },
+      { id: 8,  cat: 'airpods', name: 'AirPods Pro 2', price: 18000, stock: 'В наличии' },
+      { id: 9,  cat: 'airpods', name: 'AirPods 4', price: 12000, stock: 'В наличии' },
+      { id: 10, cat: 'watch', name: 'Apple Watch SE 44mm', price: 21000, stock: 'В наличии' },
+      { id: 11, cat: 'watch', name: 'Apple Watch S10 46mm', price: 39000, stock: 'Под заказ' },
+      { id: 12, cat: 'macbook', name: 'MacBook Air 13 M3 256', price: 92000, stock: 'В наличии' },
+      { id: 13, cat: 'ipad', name: 'iPad 10 64 Blue', price: 34000, stock: 'В наличии' },
+      { id: 14, cat: 'accessories', name: 'Зарядка USB-C 20W', price: 1500, stock: 'В наличии' },
+      { id: 15, cat: 'accessories', name: 'Кабель USB-C — Lightning 1м', price: 900, stock: 'В наличии' },
+      { id: 16, cat: 'accessories', name: 'Чехол iPhone 16 Pro силикон', price: 1200, stock: 'В наличии' },
+      { id: 17, cat: 'accessories', name: 'Наушники беспроводные TWS', price: 2500, stock: 'В наличии' },
+      { id: 18, cat: 'dyson', name: 'Dyson Airwrap', price: 45000, stock: 'Под заказ' },
+      { id: 19, cat: 'marshall', name: 'Marshall Major V', price: 14000, stock: 'В наличии' },
+      { id: 20, cat: 'android', name: 'Samsung Galaxy S24 256', price: 68000, stock: 'В наличии' },
+    ];
+
+    const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
+    const stockTone = (s) => s === 'В наличии' ? 'text-emerald-600 bg-emerald-50'
+      : s === 'Под заказ' ? 'text-amber-600 bg-amber-50' : 'text-sky-600 bg-sky-50';
+
+    createApp({
+      setup() {
+        const screen = ref('welcome');        // welcome | categories | products | cart
+        const activeCat = ref(null);
+        const selectedProduct = ref(null);    // товар для bottom-sheet
+        const cart = reactive([]);            // [{ ...product, qty }]
+
+        const store = { name: 'TechStore', tagline: 'iPhone, Samsung и аксессуары в вашем городе' };
+
+        // --- каталог/фильтры ---
+        const search = ref('');
+        const sort = ref('cheap');            // cheap | expensive | fast
+        const maxPrice = ref(120000);
+        const priceCeil = 120000;
+
+        const catProducts = computed(() =>
+          PRODUCTS.filter(p => p.cat === activeCat.value?.id));
+
+        const visibleProducts = computed(() => {
+          let list = catProducts.value.filter(p =>
+            p.name.toLowerCase().includes(search.value.trim().toLowerCase()) &&
+            p.price <= maxPrice.value);
+          if (sort.value === 'cheap') list = [...list].sort((a,b)=>a.price-b.price);
+          if (sort.value === 'expensive') list = [...list].sort((a,b)=>b.price-a.price);
+          if (sort.value === 'fast') { // "быстрее" = сначала то, что в наличии
+            const rank = { 'В наличии':0, 'Под заказ':1 };
+            list = [...list].sort((a,b)=>(rank[a.stock]??2)-(rank[b.stock]??2));
+          }
+          return list;
+        });
+
+        // --- корзина ---
+        const cartCount = computed(() => cart.reduce((s,i)=>s+i.qty,0));
+        const cartTotal = computed(() => cart.reduce((s,i)=>s+i.qty*i.price,0));
+        const showCartFab = computed(() =>
+          cartCount.value > 0 && screen.value !== 'cart' && !selectedProduct.value);
+
+        function addToCart(p) {
+          const found = cart.find(i => i.id === p.id);
+          if (found) found.qty++; else cart.push({ ...p, qty: 1 });
+          selectedProduct.value = null;
+        }
+        function inc(i){ i.qty++; }
+        function dec(i){ if(i.qty>1) i.qty--; else remove(i); }
+        function remove(i){ const idx=cart.indexOf(i); if(idx>-1) cart.splice(idx,1); }
+        function clearCart(){ cart.splice(0, cart.length); }
+
+        function openCategory(c){ activeCat.value=c; search.value=''; sort.value='cheap'; maxPrice.value=priceCeil; screen.value='products'; }
+        function submitOrder(){
+          // здесь mini app отправит данные боту -> бот перешлёт менеджеру
+          alert('Заказ отправлен менеджеру!\n\n' +
+            cart.map(i=>`• ${i.name} ×${i.qty}`).join('\n') +
+            `\n\nИтого: ${fmt(cartTotal.value)}`);
+          clearCart(); screen.value='categories';
+        }
+
+        return { screen, activeCat, selectedProduct, cart, store, search, sort, maxPrice, priceCeil,
+          catProducts, visibleProducts, cartCount, cartTotal, showCartFab, categories: CATEGORIES,
+          addToCart, inc, dec, remove, clearCart, openCategory, submitOrder, fmt, stockTone };
+      },
+      template: `
+      <div class="mx-auto max-w-md min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+
+        <!-- ===== Header ===== -->
+        <header v-if="screen!=='welcome'" class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-border">
+          <div class="h-14 px-3 flex items-center gap-2">
+            <button v-if="screen!=='categories'" @click="screen = screen==='cart' ? 'products' : 'categories'"
+              class="h-9 w-9 -ml-1 grid place-items-center rounded-md hover:bg-secondary text-foreground">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <h1 class="font-semibold text-[15px] truncate">
+              <span v-if="screen==='categories'">Каталог</span>
+              <span v-else-if="screen==='products'">{{ activeCat?.emoji }} {{ activeCat?.name }}</span>
+              <span v-else-if="screen==='cart'">Корзина</span>
+            </h1>
+          </div>
+        </header>
+
+        <main class="flex-1 relative">
+        <transition name="screen" mode="out-in">
+
+          <!-- ===== 1. Welcome ===== -->
+          <section v-if="screen==='welcome'" key="welcome"
+            class="min-h-screen flex flex-col items-center justify-center text-center px-8 gap-6">
+            <div class="h-20 w-20 rounded-2xl bg-primary text-primary-foreground grid place-items-center text-3xl shadow-lg">🛍️</div>
+            <div class="space-y-2">
+              <h1 class="text-2xl font-bold text-foreground">{{ store.name }}</h1>
+              <p class="text-muted-foreground text-[15px] leading-relaxed">{{ store.tagline }}</p>
+              <p class="text-muted-foreground text-sm">Добро пожаловать! Выбирайте товары прямо в Telegram.</p>
+            </div>
+            <button @click="screen='categories'"
+              class="w-full h-12 rounded-lg bg-primary text-primary-foreground font-medium text-[15px] active:scale-[.99] transition shadow">
+              Перейти в каталог
+            </button>
+          </section>
+
+          <!-- ===== 2. Categories ===== -->
+          <section v-else-if="screen==='categories'" key="categories" class="p-3 pb-24">
+            <div class="grid grid-cols-2 gap-3">
+              <button v-for="c in categories" :key="c.id" @click="openCategory(c)"
+                class="group rounded-xl bg-card border border-border p-4 flex flex-col gap-3 text-left hover:shadow-md hover:-translate-y-0.5 transition active:scale-[.98]">
+                <div class="h-24 w-full rounded-lg bg-secondary grid place-items-center text-4xl">{{ c.emoji }}</div>
+                <div class="font-medium text-[14px] text-foreground leading-tight">{{ c.name }}</div>
+              </button>
+            </div>
+          </section>
+
+          <!-- ===== 3. Products ===== -->
+          <section v-else-if="screen==='products'" key="products" class="pb-28">
+            <div class="sticky top-14 z-10 bg-slate-50/95 backdrop-blur px-3 pt-3 pb-2 space-y-3 border-b border-border">
+              <!-- поиск -->
+              <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input v-model="search" type="text" placeholder="Поиск товаров"
+                  class="w-full h-10 pl-9 pr-3 rounded-lg bg-white border border-input text-sm outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring" />
+              </div>
+              <!-- сортировка -->
+              <div class="flex gap-2">
+                <button v-for="opt in [{k:'cheap',t:'Дешевле'},{k:'expensive',t:'Дороже'},{k:'fast',t:'Быстрее'}]" :key="opt.k"
+                  @click="sort=opt.k"
+                  :class="['h-8 px-3 rounded-full text-[13px] font-medium border transition',
+                    sort===opt.k ? 'bg-primary text-primary-foreground border-primary' : 'bg-white text-foreground border-border']">
+                  {{ opt.t }}
+                </button>
+              </div>
+              <!-- фильтр по цене -->
+              <div class="flex items-center gap-3">
+                <span class="text-[13px] text-muted-foreground whitespace-nowrap">до {{ fmt(maxPrice) }}</span>
+                <input type="range" min="900" :max="priceCeil" step="500" v-model.number="maxPrice"
+                  class="flex-1 accent-primary" />
+              </div>
+            </div>
+
+            <div class="p-3 grid grid-cols-2 gap-3">
+              <button v-for="p in visibleProducts" :key="p.id" @click="selectedProduct=p"
+                class="rounded-xl bg-card border border-border overflow-hidden text-left hover:shadow-md transition active:scale-[.98] flex flex-col">
+                <div class="aspect-square bg-secondary grid place-items-center text-4xl">{{ activeCat?.emoji }}</div>
+                <div class="p-2.5 flex flex-col gap-1 flex-1">
+                  <div class="text-[13px] font-medium leading-tight text-foreground line-clamp-2">{{ p.name }}</div>
+                  <span :class="['text-[11px] px-1.5 py-0.5 rounded w-fit font-medium', stockTone(p.stock)]">{{ p.stock }}</span>
+                  <div class="mt-auto pt-1 font-semibold text-[15px] text-foreground">{{ fmt(p.price) }}</div>
+                </div>
+              </button>
+            </div>
+            <p v-if="visibleProducts.length===0" class="text-center text-muted-foreground text-sm py-10">Ничего не найдено</p>
+          </section>
+
+          <!-- ===== 4. Cart ===== -->
+          <section v-else-if="screen==='cart'" key="cart" class="pb-36">
+            <div v-if="cart.length===0" class="text-center text-muted-foreground py-20 px-8">
+              <div class="text-5xl mb-3">🛒</div>
+              <p class="text-sm">Корзина пуста</p>
+              <button @click="screen='categories'" class="mt-4 h-10 px-4 rounded-lg bg-secondary text-foreground text-sm font-medium">В каталог</button>
+            </div>
+            <div v-else class="p-3 space-y-2">
+              <div class="flex justify-between items-center px-1 pb-1">
+                <span class="text-sm text-muted-foreground">{{ cart.length }} поз.</span>
+                <button @click="clearCart" class="text-[13px] text-red-500 font-medium">Очистить</button>
+              </div>
+              <div v-for="i in cart" :key="i.id" class="rounded-xl bg-card border border-border p-3 flex gap-3 items-center">
+                <div class="h-14 w-14 shrink-0 rounded-lg bg-secondary grid place-items-center text-2xl">
+                  {{ (categories.find(c=>c.id===i.cat)||{}).emoji }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] font-medium leading-tight line-clamp-2">{{ i.name }}</div>
+                  <div class="text-[14px] font-semibold mt-0.5">{{ fmt(i.price) }}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button @click="dec(i)" class="h-8 w-8 rounded-md bg-secondary grid place-items-center text-lg font-medium">−</button>
+                  <span class="w-5 text-center text-sm font-medium">{{ i.qty }}</span>
+                  <button @click="inc(i)" class="h-8 w-8 rounded-md bg-secondary grid place-items-center text-lg font-medium">+</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </transition>
+        </main>
+
+        <!-- ===== Плавающая кнопка корзины (сохраняется между экранами) ===== -->
+        <transition name="fade">
+          <div v-if="showCartFab" class="fixed bottom-4 left-1/2 -translate-x-1/2 w-full max-w-md px-3 z-30">
+            <button @click="screen='cart'"
+              class="w-full h-12 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-between px-4 shadow-lg active:scale-[.99] transition">
+              <span class="flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                Корзина · {{ cartCount }}
+              </span>
+              <span>{{ fmt(cartTotal) }}</span>
+            </button>
+          </div>
+        </transition>
+
+        <!-- ===== Кнопка "оформить" на экране корзины ===== -->
+        <transition name="fade">
+          <div v-if="screen==='cart' && cart.length>0" class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md p-3 bg-white border-t border-border z-30">
+            <div class="flex justify-between items-center mb-2 px-1">
+              <span class="text-muted-foreground text-sm">Итого</span>
+              <span class="font-bold text-lg">{{ fmt(cartTotal) }}</span>
+            </div>
+            <button @click="submitOrder"
+              class="w-full h-12 rounded-lg bg-primary text-primary-foreground font-medium active:scale-[.99] transition shadow">
+              Отправить заказ менеджеру
+            </button>
+            <p class="text-[11px] text-muted-foreground text-center mt-2">Цена ориентировочная — менеджер подтвердит наличие и стоимость</p>
+          </div>
+        </transition>
+
+        <!-- ===== Bottom-sheet карточка товара ===== -->
+        <transition name="fade">
+          <div v-if="selectedProduct" @click="selectedProduct=null" class="fixed inset-0 bg-black/40 z-40"></div>
+        </transition>
+        <transition name="sheet">
+          <div v-if="selectedProduct" class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white rounded-t-2xl z-50 pb-6">
+            <div class="pt-3 flex justify-center"><div class="h-1 w-10 rounded-full bg-slate-300"></div></div>
+            <div class="p-4 space-y-4">
+              <div class="aspect-square w-full rounded-xl bg-secondary grid place-items-center text-6xl">{{ activeCat?.emoji }}</div>
+              <div class="space-y-2">
+                <h2 class="text-lg font-semibold leading-tight">{{ selectedProduct.name }}</h2>
+                <span :class="['text-[12px] px-2 py-0.5 rounded w-fit font-medium inline-block', stockTone(selectedProduct.stock)]">{{ selectedProduct.stock }}</span>
+                <div class="text-2xl font-bold">{{ fmt(selectedProduct.price) }}</div>
+                <p class="text-[13px] text-muted-foreground">Цену и наличие уточняйте — менеджер подтвердит при заказе.</p>
+              </div>
+              <button @click="addToCart(selectedProduct)"
+                class="w-full h-12 rounded-lg bg-primary text-primary-foreground font-medium active:scale-[.99] transition shadow">
+                Добавить в корзину
+              </button>
+            </div>
+          </div>
+        </transition>
+
+      </div>
+      `
+    }).mount('#app');
+  </script>
+</body>
+</html>
